@@ -40,7 +40,7 @@ AP radio settings via pluggable connectors. It supports:
   - Continuous data collection from Orb + AP polling
   - Test window management (begin/end)
   - Performance reports with percentile analysis
-  - Automated channel/width sweep testing`,
+  - AP client stats via pluggable connectors`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize store — use read-only for commands that don't write
 		var err error
@@ -111,6 +111,5 @@ func init() {
 		newStatusCmd(),
 		newReportCmd(),
 		newDumpCmd(),
-		newSweepCmd(),
 	)
 }

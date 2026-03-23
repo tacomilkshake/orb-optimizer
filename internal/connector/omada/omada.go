@@ -67,15 +67,3 @@ func (c *Connector) GetClient(mac string) (*connector.ClientInfo, error) {
 
 	return &info, nil
 }
-
-// SetRadio changes AP radio settings.
-// TODO: Requires additional REST endpoint on omada-bridge.
-func (c *Connector) SetRadio(apMAC string, cfg connector.RadioConfig) error {
-	return fmt.Errorf("omada: SetRadio not yet implemented (needs omada-bridge REST endpoint)")
-}
-
-// ReconnectClient forces a client to reconnect.
-// TODO: Requires additional REST endpoint on omada-bridge.
-func (c *Connector) ReconnectClient(mac string) error {
-	return fmt.Errorf("omada: ReconnectClient not yet implemented (needs omada-bridge REST endpoint)")
-}
