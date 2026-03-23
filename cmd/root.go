@@ -1,0 +1,109 @@
+// Package cmd provides the CLI commands for orb-optimizer.
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/tacomilkshake/orb-optimizer/internal/connector"
+	"github.com/tacomilkshake/orb-optimizer/internal/connector/omada"
+	"github.com/tacomilkshake/orb-optimizer/internal/orb"
+	"github.com/tacomilkshake/orb-optimizer/internal/store"
+)
+
+var (
+	dbPath       string
+	orbHost      string
+	orbPort      int
+	apConnector  string
+	apURL        string
+	clientMAC    string
+	clientMACs   []string // parsed from comma-separated clientMAC
+)
+
+// Initialized in PersistentPreRunE.
+var (
+	db        *store.Store
+	orbClient *orb.Client
+	apConn    connector.APConnector
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "orb-optimizer",
+	Short: "WiFi performance test harness with Orb network sensors",
+	Long: `orb-optimizer collects data from Orb network sensors and manages
+AP radio settings via pluggable connectors. It supports:
+
+  - Continuous data collection from Orb + AP polling
+  - Test window management (begin/end)
+  - Performance reports with percentile analysis
+  - Automated channel/width sweep testing`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize store
+		var err error
+		db, err = store.New(dbPath)
+		if err != nil {
+			return fmt.Errorf("open database: %w", err)
+		}
+
+		// Initialize Orb client
+		orbClient = orb.NewClient(orbHost, orbPort)
+
+		// Initialize AP connector
+		switch apConnector {
+		case "omada":
+			apConn = omada.New(apURL)
+		case "none", "":
+			apConn = nil
+		default:
+			return fmt.Errorf("unknown AP connector: %s", apConnector)
+		}
+
+		// Parse comma-separated client MACs
+		clientMACs = nil
+		for _, m := range strings.Split(clientMAC, ",") {
+			m = strings.TrimSpace(m)
+			if m != "" {
+				clientMACs = append(clientMACs, m)
+			}
+		}
+
+		return nil
+	},
+	TraverseChildren: true,
+	SilenceUsage:     true,
+	SilenceErrors:    true,
+}
+
+// Execute runs the root command.
+func Execute() error {
+	err := rootCmd.Execute()
+	if db != nil {
+		db.Close()
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+	}
+	return err
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(&dbPath, "db", "orb-optimizer.duckdb", "DuckDB database path")
+	rootCmd.PersistentFlags().StringVar(&orbHost, "orb-host", "10.0.1.47", "Orb sensor host")
+	rootCmd.PersistentFlags().IntVar(&orbPort, "orb-port", 8000, "Orb sensor port")
+	rootCmd.PersistentFlags().StringVar(&apConnector, "ap-connector", "omada", "AP connector (omada, none)")
+	rootCmd.PersistentFlags().StringVar(&apURL, "ap-url", "http://omada-bridge:8086", "AP connector base URL")
+	rootCmd.PersistentFlags().StringVar(&clientMAC, "client-mac", "20-F0-94-22-78-0D", "Client MAC address(es) to monitor (comma-separated for multiple)")
+
+	rootCmd.AddCommand(
+		newCollectCmd(),
+		newBeginCmd(),
+		newEndCmd(),
+		newStatusCmd(),
+		newReportCmd(),
+		newDumpCmd(),
+		newSweepCmd(),
+	)
+}
