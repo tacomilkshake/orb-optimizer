@@ -64,22 +64,22 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if latest != nil {
 		age := time.Since(latest.OrbTimestamp)
 		latencyMS := "nil"
-		if latest.RouterLatencyAvgUS.Valid {
-			latencyMS = fmt.Sprintf("%.2fms", float64(latest.RouterLatencyAvgUS.Int64)/1000.0)
+		if latest.LatencyAvgUS.Valid {
+			latencyMS = fmt.Sprintf("%.2fms", float64(latest.LatencyAvgUS.Int64)/1000.0)
 		}
 		jitterMS := "nil"
-		if latest.RouterJitterAvgUS.Valid {
-			jitterMS = fmt.Sprintf("%.2fms", float64(latest.RouterJitterAvgUS.Int64)/1000.0)
+		if latest.JitterAvgUS.Valid {
+			jitterMS = fmt.Sprintf("%.2fms", float64(latest.JitterAvgUS.Int64)/1000.0)
 		}
 		lossPct := "nil"
-		if latest.RouterPacketLossPct.Valid {
-			lossPct = fmt.Sprintf("%.1f%%", latest.RouterPacketLossPct.Float64)
+		if latest.PacketLossPct.Valid {
+			lossPct = fmt.Sprintf("%.1f%%", latest.PacketLossPct.Float64)
 		}
 		ssid := ""
 		if latest.NetworkName.Valid {
 			ssid = latest.NetworkName.String
 		}
-		fmt.Printf("[status] Latest: router_latency=%s jitter=%s loss=%s SSID=%s (%.0fs ago)\n",
+		fmt.Printf("[status] Latest: latency=%s jitter=%s loss=%s SSID=%s (%.0fs ago)\n",
 			latencyMS, jitterMS, lossPct, ssid, age.Seconds())
 	}
 

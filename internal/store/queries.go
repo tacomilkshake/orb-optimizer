@@ -360,22 +360,22 @@ func (s *Store) TotalCounts() (tests, resp, wifi, speed int64, err error) {
 
 // LatestReading holds the most recent responsiveness reading.
 type LatestReading struct {
-	OrbTimestamp        time.Time
-	RouterLatencyAvgUS  sql.NullInt64
-	RouterJitterAvgUS   sql.NullInt64
-	RouterPacketLossPct sql.NullFloat64
-	NetworkName         sql.NullString
+	OrbTimestamp   time.Time
+	LatencyAvgUS   sql.NullInt64
+	JitterAvgUS    sql.NullInt64
+	PacketLossPct  sql.NullFloat64
+	NetworkName    sql.NullString
 }
 
 // GetLatestReading returns the most recent responsiveness record.
 func (s *Store) GetLatestReading() (*LatestReading, error) {
 	var lr LatestReading
 	err := s.db.QueryRow(`
-		SELECT orb_timestamp, router_latency_avg_us, router_jitter_avg_us,
-		       router_packet_loss_pct, network_name
+		SELECT orb_timestamp, latency_avg_us, jitter_avg_us,
+		       packet_loss_pct, network_name
 		FROM responsiveness ORDER BY orb_timestamp DESC LIMIT 1`).Scan(
-		&lr.OrbTimestamp, &lr.RouterLatencyAvgUS, &lr.RouterJitterAvgUS,
-		&lr.RouterPacketLossPct, &lr.NetworkName)
+		&lr.OrbTimestamp, &lr.LatencyAvgUS, &lr.JitterAvgUS,
+		&lr.PacketLossPct, &lr.NetworkName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -427,23 +427,23 @@ func (s *Store) GetReportRows() ([]ReportRow, error) {
 				t.ap_rssi,
 				t.ap_snr,
 				COUNT(*) AS total,
-				COUNT(r.router_latency_avg_us) AS n,
-				COUNT(*) - COUNT(r.router_latency_avg_us) AS missed,
-				PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY r.router_latency_avg_us) / 1000.0 AS p05_ms,
-				PERCENTILE_CONT(0.10) WITHIN GROUP (ORDER BY r.router_latency_avg_us) / 1000.0 AS p10_ms,
-				PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY r.router_latency_avg_us) / 1000.0 AS p50_ms,
-				PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY r.router_latency_avg_us) / 1000.0 AS p90_ms,
-				PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY r.router_latency_avg_us) / 1000.0 AS p95_ms,
-				AVG(r.router_latency_avg_us) / 1000.0 AS avg_ms,
-				MIN(r.router_latency_avg_us) / 1000.0 AS min_ms,
-				MAX(r.router_latency_avg_us) / 1000.0 AS max_ms,
-				AVG(r.router_jitter_avg_us) / 1000.0 AS jitter_ms,
-				AVG(r.router_packet_loss_pct) AS loss_pct
+				COUNT(r.latency_avg_us) AS n,
+				COUNT(*) - COUNT(r.latency_avg_us) AS missed,
+				PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY r.latency_avg_us) / 1000.0 AS p05_ms,
+				PERCENTILE_CONT(0.10) WITHIN GROUP (ORDER BY r.latency_avg_us) / 1000.0 AS p10_ms,
+				PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY r.latency_avg_us) / 1000.0 AS p50_ms,
+				PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY r.latency_avg_us) / 1000.0 AS p90_ms,
+				PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY r.latency_avg_us) / 1000.0 AS p95_ms,
+				AVG(r.latency_avg_us) / 1000.0 AS avg_ms,
+				MIN(r.latency_avg_us) / 1000.0 AS min_ms,
+				MAX(r.latency_avg_us) / 1000.0 AS max_ms,
+				AVG(r.jitter_avg_us) / 1000.0 AS jitter_ms,
+				AVG(r.packet_loss_pct) AS loss_pct
 			FROM tests t
 			JOIN responsiveness r ON r.test_id = t.id
 			WHERE t.end_time IS NOT NULL
 			GROUP BY t.id, t.name, t.channel, t.width_mhz, t.ap_rssi, t.ap_snr
-			HAVING COUNT(r.router_latency_avg_us) > 0
+			HAVING COUNT(r.latency_avg_us) > 0
 		),
 		wifi_stats AS (
 			SELECT
