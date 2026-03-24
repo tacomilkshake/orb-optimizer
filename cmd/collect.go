@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +17,7 @@ const (
 	orbPollInterval   = 1 * time.Second
 	apPollInterval    = 30 * time.Second
 	speedPollInterval = 60 * time.Second
+	pruneInterval     = 1 * time.Hour
 	statusLogInterval = 60
 )
 
@@ -27,7 +29,28 @@ func newCollectCmd() *cobra.Command {
 	}
 }
 
+// parseRetain parses a retention string like "7d", "24h", or "0" (disabled).
+func parseRetain(s string) (time.Duration, error) {
+	if s == "" || s == "0" {
+		return 0, nil
+	}
+	// Support "Nd" shorthand for days
+	if strings.HasSuffix(s, "d") {
+		days, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err != nil {
+			return 0, fmt.Errorf("invalid retain duration %q: %w", s, err)
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
+}
+
 func runCollect(cmd *cobra.Command, args []string) error {
+	retainDuration, err := parseRetain(retain)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("[collector] DB: %s\n", dbPath)
 	for _, t := range orbTargets {
 		fmt.Printf("[collector] Orb: %s (device=%s) every %s\n", t.Client.BaseURL(), t.DeviceID, orbPollInterval)
@@ -38,6 +61,9 @@ func runCollect(cmd *cobra.Command, args []string) error {
 	fmt.Printf("[collector] Speed results: every %s\n", speedPollInterval)
 	if apConn != nil {
 		fmt.Printf("[collector] AP: %s (all clients) every %s\n", apConn.Name(), apPollInterval)
+	}
+	if retainDuration > 0 {
+		fmt.Printf("[collector] Retention: %s (prune every %s)\n", retain, pruneInterval)
 	}
 	fmt.Println("[collector] Press Ctrl+C to stop")
 
@@ -76,6 +102,7 @@ func runCollect(cmd *cobra.Command, args []string) error {
 		totalAP       int
 		lastAPPoll    time.Time
 		lastSpeedPoll time.Time
+		lastPrune     time.Time
 	)
 
 	for {
@@ -161,6 +188,17 @@ func runCollect(cmd *cobra.Command, args []string) error {
 				}
 			}
 			lastSpeedPoll = time.Now()
+		}
+
+		// Prune old data periodically
+		if retainDuration > 0 && time.Since(lastPrune) >= pruneInterval {
+			pruned, err := db.Prune(retainDuration)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[collector] prune: %s\n", err)
+			} else if pruned > 0 {
+				fmt.Printf("[collector] Pruned %d records older than %s\n", pruned, retain)
+			}
+			lastPrune = time.Now()
 		}
 
 		pollCount++

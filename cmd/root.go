@@ -23,6 +23,7 @@ var (
 	apConnector string
 	apURL       string
 	apiPort     int
+	retain      string // data retention duration (e.g. "7d", "24h")
 )
 
 // OrbTarget represents a single Orb device to poll.
@@ -134,6 +135,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apURL, "ap-url", "http://omada-bridge:8086", "AP connector base URL")
 	rootCmd.PersistentFlags().StringVar(&orbServer, "orb-server", "", "Local Orb Server address (e.g. 10.0.1.5:7443) for status/report display")
 	rootCmd.PersistentFlags().IntVar(&apiPort, "api-port", 8080, "HTTP API port for collector")
+	rootCmd.PersistentFlags().StringVar(&retain, "retain", "7d", "Data retention period (e.g. 7d, 24h, 0 to disable)")
 
 	rootCmd.AddCommand(
 		newCollectCmd(),

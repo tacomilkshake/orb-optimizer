@@ -606,6 +606,43 @@ func (s *Store) DumpTestData(testID int64) (test map[string]any, resp []map[stri
 	return
 }
 
+// Prune deletes data older than the given duration and returns total rows deleted.
+func (s *Store) Prune(olderThan time.Duration) (int64, error) {
+	cutoff := time.Now().UTC().Add(-olderThan)
+	var total int64
+
+	tables := []string{"responsiveness", "wifi_link", "scores", "speed_results", "ap_snapshots"}
+	tsCol := map[string]string{
+		"responsiveness": "collected_at",
+		"wifi_link":      "collected_at",
+		"scores":         "collected_at",
+		"speed_results":  "collected_at",
+		"ap_snapshots":   "timestamp",
+	}
+
+	for _, table := range tables {
+		res, err := s.db.Exec(
+			fmt.Sprintf("DELETE FROM %s WHERE %s < ?", table, tsCol[table]),
+			cutoff,
+		)
+		if err != nil {
+			return total, fmt.Errorf("prune %s: %w", table, err)
+		}
+		n, _ := res.RowsAffected()
+		total += n
+	}
+
+	// Clean up tests whose end_time is before the cutoff
+	res, err := s.db.Exec("DELETE FROM tests WHERE end_time IS NOT NULL AND end_time < ?", cutoff)
+	if err != nil {
+		return total, fmt.Errorf("prune tests: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	total += n
+
+	return total, nil
+}
+
 // Helper functions
 
 func nullStr(s string) sql.NullString {
